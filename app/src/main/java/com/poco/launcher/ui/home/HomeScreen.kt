@@ -63,6 +63,7 @@ import com.poco.launcher.ui.appdrawer.AppLibraryScreen
 import com.poco.launcher.ui.components.AppContextMenu
 import com.poco.launcher.ui.components.DockBar
 import com.poco.launcher.ui.components.PageIndicator
+import com.poco.launcher.ui.components.SetDefaultLauncherBanner
 import com.poco.launcher.ui.components.SpotlightSearchPill
 import com.poco.launcher.ui.components.SquircleFolderIconView
 import com.poco.launcher.ui.components.SquircleIconView
@@ -83,6 +84,8 @@ fun HomeScreen(
     activeOpenFolder: FolderItem?,
     isSpotlightVisible: Boolean,
     isSettingsVisible: Boolean,
+    isDefaultLauncher: Boolean = true,
+    isDefaultBannerDismissed: Boolean = false,
     widgetHost: LauncherWidgetHost? = null,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
@@ -101,6 +104,7 @@ fun HomeScreen(
     onCloseSettings: () -> Unit,
     onUpdateSettings: (LauncherSettings) -> Unit,
     onSetAsDefault: () -> Unit,
+    onDismissDefaultBanner: () -> Unit = {},
     onDeleteFolder: (folderId: String) -> Unit,
     onPickWidget: (() -> Unit)? = null,
     onRemoveWidget: ((Int) -> Unit)? = null,
@@ -163,6 +167,15 @@ fun HomeScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
+            // Prompt to set as default launcher if not yet set
+            if (!isDefaultLauncher && !isDefaultBannerDismissed && !isEditMode) {
+                SetDefaultLauncherBanner(
+                    isVisible = true,
+                    onSetAsDefault = onSetAsDefault,
+                    onDismiss = onDismissDefaultBanner
+                )
+            }
+
             // Edit Mode Header: "Done" pill & "+" / "Settings" buttons
             AnimatedVisibility(
                 visible = isEditMode,

@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 import com.poco.launcher.PocoLauncherApp
+import com.poco.launcher.core.system.DefaultLauncherHelper
 import com.poco.launcher.core.widget.LauncherWidgetHost
 import com.poco.launcher.ui.home.HomeScreen
 import com.poco.launcher.ui.theme.PocoLauncherTheme
@@ -30,6 +32,12 @@ class LauncherActivity : ComponentActivity() {
     private lateinit var widgetHost: LauncherWidgetHost
     private lateinit var appWidgetManager: AppWidgetManager
     private var pendingWidgetId: Int = -1
+
+    private val defaultRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.checkDefaultLauncher(this)
+    }
 
     private val widgetPickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -69,6 +77,9 @@ class LauncherActivity : ComponentActivity() {
         widgetHost = LauncherWidgetHost(applicationContext)
         appWidgetManager = AppWidgetManager.getInstance(applicationContext)
 
+        // Verify default launcher state
+        viewModel.checkDefaultLauncher(this)
+
         // 1. Configure Edge-to-Edge full immersion layout
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
@@ -92,17 +103,21 @@ class LauncherActivity : ComponentActivity() {
             val activeOpenFolder by viewModel.activeOpenFolder.collectAsState()
             val isSpotlightVisible by viewModel.isSpotlightVisible.collectAsState()
             val isSettingsVisible by viewModel.isSettingsVisible.collectAsState()
+            val isDefaultLauncher by viewModel.isDefaultLauncher.collectAsState()
+            val isDefaultBannerDismissed by viewModel.isDefaultBannerDismissed.collectAsState()
 
-            // Back button handling: dismiss topmost modal layer first
-            BackHandler(
-                enabled = isSettingsVisible || isSpotlightVisible || activeOpenFolder != null || selectedContextMenuApp != null || isEditMode
-            ) {
+            // Crucial: BackHandler is unconditionally enabled (enabled = true).
+            // A home launcher activity must NEVER close or call finish() when Back is pressed!
+            BackHandler(enabled = true) {
                 when {
                     isSettingsVisible -> viewModel.closeSettings()
                     isSpotlightVisible -> viewModel.dismissSpotlight()
                     activeOpenFolder != null -> viewModel.closeFolder()
                     selectedContextMenuApp != null -> viewModel.dismissContextMenu()
                     isEditMode -> viewModel.exitEditMode()
+                    else -> {
+                        // At root home screen: consume event, never exit launcher!
+                    }
                 }
             }
 
@@ -133,6 +148,8 @@ class LauncherActivity : ComponentActivity() {
                         activeOpenFolder = activeOpenFolder,
                         isSpotlightVisible = isSpotlightVisible,
                         isSettingsVisible = isSettingsVisible,
+                        isDefaultLauncher = isDefaultLauncher,
+                        isDefaultBannerDismissed = isDefaultBannerDismissed,
                         widgetHost = widgetHost,
                         onAppClick = { app ->
                             viewModel.launchApp(app)
@@ -183,7 +200,10 @@ class LauncherActivity : ComponentActivity() {
                             viewModel.updateSettings(newSettings)
                         },
                         onSetAsDefault = {
-                            viewModel.promptSetAsDefault(this@LauncherActivity)
+                            requestSetDefault()
+                        },
+                        onDismissDefaultBanner = {
+                            viewModel.dismissDefaultBanner()
                         },
                         onDeleteFolder = { folderId ->
                             viewModel.deleteFolder(folderId)
@@ -197,6 +217,15 @@ class LauncherActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    private fun requestSetDefault() {
+        val roleIntent = DefaultLauncherHelper.createSetDefaultLauncherIntent(this)
+        if (roleIntent != null) {
+            defaultRoleLauncher.launch(roleIntent)
+        } else {
+            DefaultLauncherHelper.openDefaultLauncherSettings(this)
         }
     }
 
@@ -257,5 +286,20 @@ class LauncherActivity : ComponentActivity() {
         super.onResume()
         // Refresh battery and system states
         PocoLauncherApp.instance.systemControllers.updateBatteryState()
+        // Refresh default launcher status
+        viewModel.checkDefaultLauncher(this)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        // Prevent default finish - Home launcher must stay active
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            // Handled via Compose BackHandler, prevent Activity from finishing
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 }

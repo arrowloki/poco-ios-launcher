@@ -63,6 +63,12 @@ class LauncherViewModel : ViewModel() {
     private val _isSettingsVisible = MutableStateFlow(false)
     val isSettingsVisible: StateFlow<Boolean> = _isSettingsVisible.asStateFlow()
 
+    private val _isDefaultLauncher = MutableStateFlow(true)
+    val isDefaultLauncher: StateFlow<Boolean> = _isDefaultLauncher.asStateFlow()
+
+    private val _isDefaultBannerDismissed = MutableStateFlow(false)
+    val isDefaultBannerDismissed: StateFlow<Boolean> = _isDefaultBannerDismissed.asStateFlow()
+
     // Dock apps combined from stored IDs or intelligent system defaults
     val dockApps: StateFlow<List<AppItem>> = combine(
         installedApps,
@@ -355,31 +361,27 @@ class LauncherViewModel : ViewModel() {
         }
     }
 
-    fun promptSetAsDefault(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = context.getSystemService(Context.ROLE_SERVICE) as? RoleManager
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                if (!roleManager.isRoleHeld(RoleManager.ROLE_HOME)) {
-                    val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                    return
-                }
-            }
-        }
+    fun checkDefaultLauncher(context: Context) {
+        _isDefaultLauncher.value = com.poco.launcher.core.system.DefaultLauncherHelper.isDefaultLauncher(context)
+    }
 
-        // Fallback for devices / MIUI
-        val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        try {
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            val homeIntent = Intent(Settings.ACTION_HOME_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    fun dismissDefaultBanner() {
+        _isDefaultBannerDismissed.value = true
+    }
+
+    fun promptSetAsDefault(context: Context) {
+        val roleIntent = com.poco.launcher.core.system.DefaultLauncherHelper.createSetDefaultLauncherIntent(context)
+        if (roleIntent != null) {
+            try {
+                if (context !is android.app.Activity) {
+                    roleIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(roleIntent)
+                return
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            context.startActivity(homeIntent)
         }
+        com.poco.launcher.core.system.DefaultLauncherHelper.openDefaultLauncherSettings(context)
     }
 }

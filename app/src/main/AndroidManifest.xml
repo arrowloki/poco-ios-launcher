@@ -36,7 +36,7 @@
             android:name=".ui.LauncherActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:clearTaskOnLaunch="false"
+            android:clearTaskOnLaunch="true"
             android:stateNotNeeded="true"
             android:resumeWhilePausing="true"
             android:windowSoftInputMode="adjustPan"
