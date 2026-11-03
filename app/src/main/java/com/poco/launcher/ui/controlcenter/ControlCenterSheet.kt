@@ -70,6 +70,7 @@ import com.poco.launcher.ui.theme.IosColors
 fun ControlCenterSheet(
     isVisible: Boolean,
     onDismiss: () -> Unit,
+    onOpenSettings: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (!isVisible) return
@@ -371,7 +372,11 @@ fun ControlCenterSheet(
                         onClick = {
                             sys.performHaptic(view)
                             onDismiss()
-                            sys.openSystemSettings()
+                            if (onOpenSettings != null) {
+                                onOpenSettings()
+                            } else {
+                                sys.openSystemSettings()
+                            }
                         },
                         modifier = Modifier.weight(1f)
                     )

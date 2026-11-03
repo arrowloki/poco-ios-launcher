@@ -48,12 +48,14 @@ class LauncherActivity : ComponentActivity() {
             val selectedContextMenuApp by viewModel.selectedContextMenuApp.collectAsState()
             val activeOpenFolder by viewModel.activeOpenFolder.collectAsState()
             val isSpotlightVisible by viewModel.isSpotlightVisible.collectAsState()
+            val isSettingsVisible by viewModel.isSettingsVisible.collectAsState()
 
             // Back button handling: dismiss topmost modal layer first
             BackHandler(
-                enabled = isSpotlightVisible || activeOpenFolder != null || selectedContextMenuApp != null || isEditMode
+                enabled = isSettingsVisible || isSpotlightVisible || activeOpenFolder != null || selectedContextMenuApp != null || isEditMode
             ) {
                 when {
+                    isSettingsVisible -> viewModel.closeSettings()
                     isSpotlightVisible -> viewModel.dismissSpotlight()
                     activeOpenFolder != null -> viewModel.closeFolder()
                     selectedContextMenuApp != null -> viewModel.dismissContextMenu()
@@ -87,6 +89,7 @@ class LauncherActivity : ComponentActivity() {
                         selectedContextMenuApp = selectedContextMenuApp,
                         activeOpenFolder = activeOpenFolder,
                         isSpotlightVisible = isSpotlightVisible,
+                        isSettingsVisible = isSettingsVisible,
                         onAppClick = { app ->
                             viewModel.launchApp(app)
                         },
@@ -125,6 +128,18 @@ class LauncherActivity : ComponentActivity() {
                         },
                         onDismissSpotlight = {
                             viewModel.dismissSpotlight()
+                        },
+                        onOpenSettings = {
+                            viewModel.openSettings()
+                        },
+                        onCloseSettings = {
+                            viewModel.closeSettings()
+                        },
+                        onUpdateSettings = { newSettings ->
+                            viewModel.updateSettings(newSettings)
+                        },
+                        onSetAsDefault = {
+                            viewModel.promptSetAsDefault(this@LauncherActivity)
                         },
                         onDeleteFolder = { folderId ->
                             viewModel.deleteFolder(folderId)

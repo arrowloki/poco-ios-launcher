@@ -32,7 +32,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +63,7 @@ import com.poco.launcher.ui.components.SpotlightSearchPill
 import com.poco.launcher.ui.components.SquircleFolderIconView
 import com.poco.launcher.ui.components.SquircleIconView
 import com.poco.launcher.ui.controlcenter.ControlCenterSheet
+import com.poco.launcher.ui.settings.LauncherSettingsScreen
 import com.poco.launcher.ui.theme.IosColors
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -76,6 +77,7 @@ fun HomeScreen(
     selectedContextMenuApp: AppItem?,
     activeOpenFolder: FolderItem?,
     isSpotlightVisible: Boolean,
+    isSettingsVisible: Boolean,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
     onFolderClick: (FolderItem) -> Unit,
@@ -89,6 +91,10 @@ fun HomeScreen(
     onUninstallApp: (AppItem) -> Unit,
     onShowSpotlight: () -> Unit,
     onDismissSpotlight: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onCloseSettings: () -> Unit,
+    onUpdateSettings: (LauncherSettings) -> Unit,
+    onSetAsDefault: () -> Unit,
     onDeleteFolder: (folderId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -113,20 +119,24 @@ fun HomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Vertical Drag Detector: distinguishes top-right Control Center pull from Spotlight downward swipe
+            // Vertical Drag Detector: distinguishes top-right Control Center pull from downward swipe
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onVerticalDrag = { change, dragAmount ->
                         val startX = change.position.x
                         val startY = change.position.y
-                        if (startY < 380f && startX > screenWidthPx * 0.60f && dragAmount > 20f) {
+                        if (settings.controlCenterEnabled && startY < 380f && startX > screenWidthPx * 0.60f && dragAmount > 20f) {
                             // Top right swipe: Control Center
                             change.consume()
                             showControlCenter = true
                         } else if (startY > 200f && dragAmount > 28f) {
-                            // Home area swipe down: Spotlight Search
+                            // Home area swipe down
                             change.consume()
-                            onShowSpotlight()
+                            if (settings.swipeDownAction == "control_center" && settings.controlCenterEnabled) {
+                                showControlCenter = true
+                            } else {
+                                onShowSpotlight()
+                            }
                         }
                     }
                 )
@@ -145,7 +155,7 @@ fun HomeScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // Edit Mode Header: "Done" pill & "+" button
+            // Edit Mode Header: "Done" pill & "Settings" button
             AnimatedVisibility(
                 visible = isEditMode,
                 enter = fadeIn(tween(180)) + slideInVertically(initialOffsetY = { -it }),
@@ -165,12 +175,13 @@ fun HomeScreen(
                             .clip(RoundedCornerShape(17.dp))
                             .background(Color(0x66FFFFFF))
                             .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(17.dp))
+                            .clickable { onOpenSettings() }
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = "Add Widget",
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = "Launcher Settings",
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
 
@@ -338,7 +349,17 @@ fun HomeScreen(
         // iOS Control Center Overlay Sheet
         ControlCenterSheet(
             isVisible = showControlCenter,
-            onDismiss = { showControlCenter = false }
+            onDismiss = { showControlCenter = false },
+            onOpenSettings = onOpenSettings
+        )
+
+        // Dedicated Launcher Settings Screen Overlay
+        LauncherSettingsScreen(
+            isVisible = isSettingsVisible,
+            settings = settings,
+            onUpdateSettings = onUpdateSettings,
+            onSetAsDefault = onSetAsDefault,
+            onDismiss = onCloseSettings
         )
     }
 }

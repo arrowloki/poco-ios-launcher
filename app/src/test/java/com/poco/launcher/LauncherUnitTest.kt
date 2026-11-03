@@ -4,6 +4,7 @@ import com.poco.launcher.core.model.AppItem
 import com.poco.launcher.core.model.FolderItem
 import com.poco.launcher.core.model.GridItem
 import com.poco.launcher.core.model.LauncherSettings
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -109,6 +110,44 @@ class LauncherUnitTest {
         assertTrue(settings.controlCenterEnabled)
         assertTrue(settings.blurEnabled)
         assertFalse(settings.reduceMotion)
+        assertEquals("spotlight", settings.swipeDownAction)
+    }
+
+    @Test
+    fun testJsonExportAndImportIntegrity() {
+        val json = JSONObject()
+        val settingsObj = JSONObject()
+        settingsObj.put("gridColumns", 5)
+        settingsObj.put("gridRows", 6)
+        settingsObj.put("iconSizeDp", 64)
+        settingsObj.put("showAppLabels", false)
+        settingsObj.put("dockAppsCount", 5)
+        settingsObj.put("themeMode", "dark")
+        settingsObj.put("controlCenterEnabled", true)
+        settingsObj.put("blurEnabled", false)
+        settingsObj.put("reduceMotion", true)
+        settingsObj.put("swipeDownAction", "control_center")
+
+        json.put("settings", settingsObj)
+        json.put("dockAppIds", "app1,app2,app3")
+        json.put("folders", "f1:::Social:::app1,app2")
+
+        val raw = json.toString()
+        val parsed = JSONObject(raw)
+        val parsedSettings = parsed.getJSONObject("settings")
+
+        assertEquals(5, parsedSettings.getInt("gridColumns"))
+        assertEquals(6, parsedSettings.getInt("gridRows"))
+        assertEquals(64, parsedSettings.getInt("iconSizeDp"))
+        assertFalse(parsedSettings.getBoolean("showAppLabels"))
+        assertEquals(5, parsedSettings.getInt("dockAppsCount"))
+        assertEquals("dark", parsedSettings.getString("themeMode"))
+        assertTrue(parsedSettings.getBoolean("controlCenterEnabled"))
+        assertFalse(parsedSettings.getBoolean("blurEnabled"))
+        assertTrue(parsedSettings.getBoolean("reduceMotion"))
+        assertEquals("control_center", parsedSettings.getString("swipeDownAction"))
+        assertEquals("app1,app2,app3", parsed.getString("dockAppIds"))
+        assertEquals("f1:::Social:::app1,app2", parsed.getString("folders"))
     }
 
     @Test

@@ -11,7 +11,9 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.poco.launcher.core.model.FolderItem
 import com.poco.launcher.core.model.LauncherSettings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "poco_launcher_prefs")
 
@@ -27,12 +29,13 @@ class LauncherDataStore(private val context: Context) {
         val CONTROL_CENTER_ENABLED = booleanPreferencesKey("control_center_enabled")
         val BLUR_ENABLED = booleanPreferencesKey("blur_enabled")
         val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
+        val SWIPE_DOWN_ACTION = stringPreferencesKey("swipe_down_action")
 
-        // JSON/CSV list of dock app IDs ("packageName/className")
+        // CSV list of dock app IDs ("packageName/className")
         val DOCK_APP_IDS = stringPreferencesKey("dock_app_ids")
         // Stored page layouts in format: "id1,id2,id3|id4,id5,id6"
         val PAGES_LAYOUT = stringPreferencesKey("pages_layout")
-        // Stored folders
+        // Stored folders format: id:::title:::appId1,appId2;;;...
         val FOLDERS = stringPreferencesKey("launcher_folders")
     }
 
@@ -46,7 +49,8 @@ class LauncherDataStore(private val context: Context) {
             themeMode = prefs[Keys.THEME_MODE] ?: "system",
             controlCenterEnabled = prefs[Keys.CONTROL_CENTER_ENABLED] ?: true,
             blurEnabled = prefs[Keys.BLUR_ENABLED] ?: true,
-            reduceMotion = prefs[Keys.REDUCE_MOTION] ?: false
+            reduceMotion = prefs[Keys.REDUCE_MOTION] ?: false,
+            swipeDownAction = prefs[Keys.SWIPE_DOWN_ACTION] ?: "spotlight"
         )
     }
 
@@ -94,6 +98,7 @@ class LauncherDataStore(private val context: Context) {
             prefs[Keys.CONTROL_CENTER_ENABLED] = settings.controlCenterEnabled
             prefs[Keys.BLUR_ENABLED] = settings.blurEnabled
             prefs[Keys.REDUCE_MOTION] = settings.reduceMotion
+            prefs[Keys.SWIPE_DOWN_ACTION] = settings.swipeDownAction
         }
     }
 
@@ -116,6 +121,55 @@ class LauncherDataStore(private val context: Context) {
             prefs[Keys.FOLDERS] = folders.joinToString(";;;") { folder ->
                 "${folder.id}:::${folder.title}:::${folder.appIds.joinToString(",")}"
             }
+        }
+    }
+
+    // --- Configuration Backup & Restore ---
+    suspend fun exportConfiguration(): String {
+        val prefs = context.dataStore.data.first()
+        val json = JSONObject()
+        val settingsObj = JSONObject()
+        settingsObj.put("gridColumns", prefs[Keys.GRID_COLUMNS] ?: 4)
+        settingsObj.put("gridRows", prefs[Keys.GRID_ROWS] ?: 6)
+        settingsObj.put("iconSizeDp", prefs[Keys.ICON_SIZE_DP] ?: 60)
+        settingsObj.put("showAppLabels", prefs[Keys.SHOW_APP_LABELS] ?: true)
+        settingsObj.put("dockAppsCount", prefs[Keys.DOCK_APPS_COUNT] ?: 4)
+        settingsObj.put("themeMode", prefs[Keys.THEME_MODE] ?: "system")
+        settingsObj.put("controlCenterEnabled", prefs[Keys.CONTROL_CENTER_ENABLED] ?: true)
+        settingsObj.put("blurEnabled", prefs[Keys.BLUR_ENABLED] ?: true)
+        settingsObj.put("reduceMotion", prefs[Keys.REDUCE_MOTION] ?: false)
+        settingsObj.put("swipeDownAction", prefs[Keys.SWIPE_DOWN_ACTION] ?: "spotlight")
+        json.put("settings", settingsObj)
+        json.put("dockAppIds", prefs[Keys.DOCK_APP_IDS] ?: "")
+        json.put("folders", prefs[Keys.FOLDERS] ?: "")
+        return json.toString(2)
+    }
+
+    suspend fun importConfiguration(rawJson: String): Boolean {
+        return try {
+            val json = JSONObject(rawJson)
+            val settingsObj = json.getJSONObject("settings")
+            context.dataStore.edit { prefs ->
+                prefs[Keys.GRID_COLUMNS] = settingsObj.optInt("gridColumns", 4)
+                prefs[Keys.GRID_ROWS] = settingsObj.optInt("gridRows", 6)
+                prefs[Keys.ICON_SIZE_DP] = settingsObj.optInt("iconSizeDp", 60)
+                prefs[Keys.SHOW_APP_LABELS] = settingsObj.optBoolean("showAppLabels", true)
+                prefs[Keys.DOCK_APPS_COUNT] = settingsObj.optInt("dockAppsCount", 4)
+                prefs[Keys.THEME_MODE] = settingsObj.optString("themeMode", "system")
+                prefs[Keys.CONTROL_CENTER_ENABLED] = settingsObj.optBoolean("controlCenterEnabled", true)
+                prefs[Keys.BLUR_ENABLED] = settingsObj.optBoolean("blurEnabled", true)
+                prefs[Keys.REDUCE_MOTION] = settingsObj.optBoolean("reduceMotion", false)
+                prefs[Keys.SWIPE_DOWN_ACTION] = settingsObj.optString("swipeDownAction", "spotlight")
+                if (json.has("dockAppIds")) {
+                    prefs[Keys.DOCK_APP_IDS] = json.getString("dockAppIds")
+                }
+                if (json.has("folders")) {
+                    prefs[Keys.FOLDERS] = json.getString("folders")
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }

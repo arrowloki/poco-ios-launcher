@@ -54,6 +54,9 @@ class LauncherViewModel : ViewModel() {
     private val _isSpotlightVisible = MutableStateFlow(false)
     val isSpotlightVisible: StateFlow<Boolean> = _isSpotlightVisible.asStateFlow()
 
+    private val _isSettingsVisible = MutableStateFlow(false)
+    val isSettingsVisible: StateFlow<Boolean> = _isSettingsVisible.asStateFlow()
+
     // Dock apps combined from stored IDs or intelligent system defaults
     val dockApps: StateFlow<List<AppItem>> = combine(
         installedApps,
@@ -189,6 +192,16 @@ class LauncherViewModel : ViewModel() {
 
     fun dismissSpotlight() {
         _isSpotlightVisible.value = false
+    }
+
+    // Settings Screen Controls
+    fun openSettings() {
+        _isSettingsVisible.value = true
+        _selectedContextMenuApp.value = null
+    }
+
+    fun closeSettings() {
+        _isSettingsVisible.value = false
     }
 
     // Folder Management

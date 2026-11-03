@@ -53,5 +53,6 @@ data class LauncherSettings(
     val themeMode: String = "system", // "system", "light", "dark"
     val controlCenterEnabled: Boolean = true,
     val blurEnabled: Boolean = true,
-    val reduceMotion: Boolean = false
+    val reduceMotion: Boolean = false,
+    val swipeDownAction: String = "spotlight" // "spotlight", "control_center"
 )
