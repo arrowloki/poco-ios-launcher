@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AirplanemodeActive
 import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.Bluetooth
@@ -39,11 +41,11 @@ import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.NetworkCell
 import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -57,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,7 +72,10 @@ fun ControlCenterSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (!isVisible) return
+
     val context = LocalContext.current
+    val view = LocalView.current
     val activity = context as? Activity
     val sys = remember { PocoLauncherApp.instance.systemControllers }
 
@@ -85,10 +91,27 @@ fun ControlCenterSheet(
         mutableFloatStateOf(sys.currentMusicVolume.toFloat() / sys.maxMusicVolume.coerceAtLeast(1))
     }
 
+    var isWifiActive by remember { mutableStateOf(sys.isWifiEnabled()) }
+    var isBluetoothActive by remember { mutableStateOf(sys.isBluetoothEnabled()) }
+    var isAutoRotateActive by remember { mutableStateOf(sys.isAutoRotateEnabled()) }
+    var isDndActive by remember { mutableStateOf(sys.isDndEnabled()) }
+
+    LaunchedEffect(isVisible) {
+        if (isVisible) {
+            sys.updateBatteryState()
+            brightnessRatio = sys.getCurrentSystemBrightnessRatio()
+            volumeRatio = sys.currentMusicVolume.toFloat() / sys.maxMusicVolume.coerceAtLeast(1)
+            isWifiActive = sys.isWifiEnabled()
+            isBluetoothActive = sys.isBluetoothEnabled()
+            isAutoRotateActive = sys.isAutoRotateEnabled()
+            isDndActive = sys.isDndEnabled()
+        }
+    }
+
     AnimatedVisibility(
         visible = isVisible,
-        enter = slideInVertically(initialOffsetY = { -it }, animationSpec = tween(320)),
-        exit = slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(280)),
+        enter = slideInVertically(initialOffsetY = { -it }, animationSpec = tween(300)),
+        exit = slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(260)),
         modifier = modifier.fillMaxSize()
     ) {
         Box(
@@ -98,6 +121,17 @@ fun ControlCenterSheet(
                 .pointerInput(Unit) {
                     detectTapGestures { onDismiss() }
                 }
+                .pointerInput(Unit) {
+                    // Swipe up to dismiss Control Center
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            if (dragAmount < -18f) {
+                                change.consume()
+                                onDismiss()
+                            }
+                        }
+                    )
+                }
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
@@ -105,11 +139,11 @@ fun ControlCenterSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .pointerInput(Unit) {
-                        // Prevent dismiss when tapping inside control center panel
+                        // Prevent dismiss when tapping inside the control platter area
                         detectTapGestures { }
                     }
             ) {
-                // Top Status Bar info: Carrier / Battery in iOS style
+                // Top Status Bar: Title & Battery telemetry
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
@@ -142,7 +176,7 @@ fun ControlCenterSheet(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Row 1: Connectivity Platter (2x2) & Sliders (Brightness + Volume)
+                // Row 1: 2x2 Connectivity Platter & Vertical Sliders (Brightness + Volume)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier
@@ -172,14 +206,20 @@ fun ControlCenterSheet(
                                     label = "Airplane",
                                     isActive = false,
                                     activeColor = IosColors.Orange,
-                                    onClick = { sys.openAirplaneModeSettings() }
+                                    onClick = {
+                                        sys.performHaptic(view)
+                                        sys.openAirplaneModeSettings()
+                                    }
                                 )
                                 ControlTileIcon(
                                     icon = Icons.Rounded.NetworkCell,
                                     label = "Cellular",
                                     isActive = true,
                                     activeColor = IosColors.Green,
-                                    onClick = { sys.openMobileDataPanel() }
+                                    onClick = {
+                                        sys.performHaptic(view)
+                                        sys.openMobileDataPanel()
+                                    }
                                 )
                             }
                             Row(
@@ -189,16 +229,22 @@ fun ControlCenterSheet(
                                 ControlTileIcon(
                                     icon = Icons.Rounded.Wifi,
                                     label = "Wi-Fi",
-                                    isActive = true,
+                                    isActive = isWifiActive,
                                     activeColor = IosColors.Blue,
-                                    onClick = { sys.openWifiPanel() }
+                                    onClick = {
+                                        sys.performHaptic(view)
+                                        sys.openWifiPanel()
+                                    }
                                 )
                                 ControlTileIcon(
                                     icon = Icons.Rounded.Bluetooth,
                                     label = "Bluetooth",
-                                    isActive = true,
+                                    isActive = isBluetoothActive,
                                     activeColor = IosColors.Blue,
-                                    onClick = { sys.openBluetoothSettings() }
+                                    onClick = {
+                                        sys.performHaptic(view)
+                                        sys.openBluetoothSettings()
+                                    }
                                 )
                             }
                         }
@@ -234,7 +280,7 @@ fun ControlCenterSheet(
                                 val newVolume = (it * sys.maxMusicVolume).toInt()
                                 sys.setMusicVolume(newVolume)
                             },
-                            icon = Icons.Rounded.VolumeUp,
+                            icon = Icons.AutoMirrored.Rounded.VolumeUp,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
@@ -244,7 +290,7 @@ fun ControlCenterSheet(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Row 2: Secondary Quick Toggles (Flashlight, Auto-Rotate, DND, Display)
+                // Row 2: Secondary Quick Toggles (Flashlight, Auto-Rotate, DND)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -254,23 +300,34 @@ fun ControlCenterSheet(
                         label = if (isTorchOn) "Torch On" else "Torch",
                         isActive = isTorchOn,
                         activeColor = IosColors.Blue,
-                        onClick = { sys.toggleTorch() },
+                        onClick = {
+                            sys.performHaptic(view)
+                            sys.toggleTorch()
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     SquareControlTile(
                         icon = Icons.Rounded.ScreenRotation,
                         label = "Rotation",
-                        isActive = false,
+                        isActive = isAutoRotateActive,
                         activeColor = IosColors.Red,
-                        onClick = { sys.openDisplaySettings() },
+                        onClick = {
+                            sys.performHaptic(view)
+                            sys.toggleAutoRotate()
+                            isAutoRotateActive = sys.isAutoRotateEnabled()
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     SquareControlTile(
                         icon = Icons.Rounded.DoNotDisturbOn,
                         label = "Focus / DND",
-                        isActive = false,
+                        isActive = isDndActive,
                         activeColor = IosColors.Indigo,
-                        onClick = { sys.openSystemSettings() },
+                        onClick = {
+                            sys.performHaptic(view)
+                            sys.toggleDnd()
+                            isDndActive = sys.isDndEnabled()
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -288,6 +345,7 @@ fun ControlCenterSheet(
                         isActive = false,
                         activeColor = IosColors.DarkGray,
                         onClick = {
+                            sys.performHaptic(view)
                             onDismiss()
                             sys.openCalculator()
                         },
@@ -299,6 +357,7 @@ fun ControlCenterSheet(
                         isActive = false,
                         activeColor = IosColors.DarkGray,
                         onClick = {
+                            sys.performHaptic(view)
                             onDismiss()
                             sys.openCamera()
                         },
@@ -310,6 +369,7 @@ fun ControlCenterSheet(
                         isActive = false,
                         activeColor = IosColors.DarkGray,
                         onClick = {
+                            sys.performHaptic(view)
                             onDismiss()
                             sys.openSystemSettings()
                         },
@@ -335,6 +395,12 @@ private fun VerticalControlSlider(
             .clip(RoundedCornerShape(22.dp))
             .background(Color(0x403A3A3C))
             .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(22.dp))
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    val ratio = 1f - (offset.y / size.height)
+                    onValueChange(ratio.coerceIn(0f, 1f))
+                }
+            }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDrag = { change, dragAmount ->

@@ -1,20 +1,22 @@
 package com.poco.launcher.core.system
 
 import android.app.Activity
+import android.app.NotificationManager
 import android.bluetooth.BluetoothAdapter
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.provider.MediaStore
 import android.provider.Settings
-import android.view.WindowManager
+import android.view.HapticFeedbackConstants
+import android.view.View
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -129,7 +131,104 @@ class SystemControllers(private val context: Context) {
         }
     }
 
-    // --- Connectivity & Quick Settings Panels ---
+    // --- Connectivity States ---
+    fun isWifiEnabled(): Boolean {
+        return try {
+            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            wifi?.isWifiEnabled == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun isBluetoothEnabled(): Boolean {
+        return try {
+            val bm = context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+            bm?.adapter?.isEnabled == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // --- Auto-Rotation Control ---
+    fun isAutoRotateEnabled(): Boolean {
+        return try {
+            Settings.System.getInt(
+                context.contentResolver,
+                Settings.System.ACCELEROMETER_ROTATION,
+                0
+            ) == 1
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun toggleAutoRotate(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.System.canWrite(context)) {
+            try {
+                val current = if (isAutoRotateEnabled()) 0 else 1
+                Settings.System.putInt(
+                    context.contentResolver,
+                    Settings.System.ACCELEROMETER_ROTATION,
+                    current
+                )
+                true
+            } catch (e: Exception) {
+                openDisplaySettings()
+                false
+            }
+        } else {
+            openDisplaySettings()
+            false
+        }
+    }
+
+    // --- Do Not Disturb (DND) / Focus Mode ---
+    private val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+
+    fun isDndEnabled(): Boolean {
+        return try {
+            val filter = notificationManager?.currentInterruptionFilter ?: NotificationManager.INTERRUPTION_FILTER_ALL
+            filter != NotificationManager.INTERRUPTION_FILTER_ALL && filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun toggleDnd(): Boolean {
+        val nm = notificationManager ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && nm.isNotificationPolicyAccessGranted) {
+            try {
+                val newFilter = if (isDndEnabled()) {
+                    NotificationManager.INTERRUPTION_FILTER_ALL
+                } else {
+                    NotificationManager.INTERRUPTION_FILTER_PRIORITY
+                }
+                nm.setInterruptionFilter(newFilter)
+                true
+            } catch (e: Exception) {
+                openDndSettings()
+                false
+            }
+        } else {
+            openDndSettings()
+            false
+        }
+    }
+
+    fun openDndSettings() {
+        val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            openSystemSettings()
+        }
+    }
+
+    // --- Panels & Settings ---
     fun openWifiPanel() {
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             Intent(Settings.Panel.ACTION_WIFI)
@@ -137,21 +236,33 @@ class SystemControllers(private val context: Context) {
             Intent(Settings.ACTION_WIFI_SETTINGS)
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            openSystemSettings()
+        }
     }
 
     fun openBluetoothSettings() {
         val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            openSystemSettings()
+        }
     }
 
     fun openAirplaneModeSettings() {
         val intent = Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            openSystemSettings()
+        }
     }
 
     fun openMobileDataPanel() {
@@ -161,22 +272,37 @@ class SystemControllers(private val context: Context) {
             Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            openSystemSettings()
+        }
     }
 
     fun openDisplaySettings() {
         val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            openSystemSettings()
+        }
     }
 
     fun openCamera() {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+        val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         if (intent.resolveActivity(context.packageManager) != null) {
             context.startActivity(intent)
+        } else {
+            val fallback = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (fallback.resolveActivity(context.packageManager) != null) {
+                context.startActivity(fallback)
+            }
         }
     }
 
@@ -193,7 +319,6 @@ class SystemControllers(private val context: Context) {
                 return
             }
         }
-        // Fallback: search general calculator
         val generic = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALCULATOR).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -209,5 +334,13 @@ class SystemControllers(private val context: Context) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
+    }
+
+    fun performHaptic(view: View) {
+        try {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        } catch (e: Exception) {
+            // Safe fallback
+        }
     }
 }
