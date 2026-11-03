@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -42,6 +43,23 @@ class LauncherActivity : ComponentActivity() {
             val settings by viewModel.settings.collectAsState()
             val installedApps by viewModel.installedApps.collectAsState()
             val dockApps by viewModel.dockApps.collectAsState()
+            val gridItems by viewModel.gridItems.collectAsState()
+            val isEditMode by viewModel.isEditMode.collectAsState()
+            val selectedContextMenuApp by viewModel.selectedContextMenuApp.collectAsState()
+            val activeOpenFolder by viewModel.activeOpenFolder.collectAsState()
+            val isSpotlightVisible by viewModel.isSpotlightVisible.collectAsState()
+
+            // Back button handling: dismiss topmost modal layer first
+            BackHandler(
+                enabled = isSpotlightVisible || activeOpenFolder != null || selectedContextMenuApp != null || isEditMode
+            ) {
+                when {
+                    isSpotlightVisible -> viewModel.dismissSpotlight()
+                    activeOpenFolder != null -> viewModel.closeFolder()
+                    selectedContextMenuApp != null -> viewModel.dismissContextMenu()
+                    isEditMode -> viewModel.exitEditMode()
+                }
+            }
 
             val isDark = when (settings.themeMode) {
                 "light" -> false
@@ -61,14 +79,55 @@ class LauncherActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize()
                 ) {
                     HomeScreen(
-                        installedApps = installedApps,
+                        gridItems = gridItems,
                         dockApps = dockApps,
+                        installedApps = installedApps,
                         settings = settings,
+                        isEditMode = isEditMode,
+                        selectedContextMenuApp = selectedContextMenuApp,
+                        activeOpenFolder = activeOpenFolder,
+                        isSpotlightVisible = isSpotlightVisible,
                         onAppClick = { app ->
                             viewModel.launchApp(app)
                         },
                         onAppLongClick = { app ->
-                            // Long-press options / drag-drop placeholder
+                            viewModel.showContextMenu(app)
+                        },
+                        onFolderClick = { folder ->
+                            viewModel.openFolder(folder)
+                        },
+                        onEnterEditMode = {
+                            viewModel.enterEditMode()
+                        },
+                        onExitEditMode = {
+                            viewModel.exitEditMode()
+                        },
+                        onDismissContextMenu = {
+                            viewModel.dismissContextMenu()
+                        },
+                        onCloseFolder = {
+                            viewModel.closeFolder()
+                        },
+                        onRenameFolder = { folderId, newTitle ->
+                            viewModel.renameFolder(folderId, newTitle)
+                        },
+                        onToggleDock = { app ->
+                            viewModel.toggleDockApp(app)
+                        },
+                        onOpenAppInfo = { app ->
+                            viewModel.openAppInfo(this@LauncherActivity, app)
+                        },
+                        onUninstallApp = { app ->
+                            viewModel.uninstallApp(this@LauncherActivity, app)
+                        },
+                        onShowSpotlight = {
+                            viewModel.showSpotlight()
+                        },
+                        onDismissSpotlight = {
+                            viewModel.dismissSpotlight()
+                        },
+                        onDeleteFolder = { folderId ->
+                            viewModel.deleteFolder(folderId)
                         }
                     )
                 }

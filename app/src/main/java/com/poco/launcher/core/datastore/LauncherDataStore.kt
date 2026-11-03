@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.poco.launcher.core.model.FolderItem
 import com.poco.launcher.core.model.LauncherSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -31,6 +32,8 @@ class LauncherDataStore(private val context: Context) {
         val DOCK_APP_IDS = stringPreferencesKey("dock_app_ids")
         // Stored page layouts in format: "id1,id2,id3|id4,id5,id6"
         val PAGES_LAYOUT = stringPreferencesKey("pages_layout")
+        // Stored folders
+        val FOLDERS = stringPreferencesKey("launcher_folders")
     }
 
     val settingsFlow: Flow<LauncherSettings> = context.dataStore.data.map { prefs ->
@@ -63,6 +66,23 @@ class LauncherDataStore(private val context: Context) {
         }
     }
 
+    val foldersFlow: Flow<List<FolderItem>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.FOLDERS] ?: ""
+        if (raw.isBlank()) {
+            emptyList()
+        } else {
+            raw.split(";;;").mapNotNull { entry ->
+                val parts = entry.split(":::")
+                if (parts.size >= 3) {
+                    val id = parts[0]
+                    val title = parts[1]
+                    val appIds = parts[2].split(",").filter { it.isNotBlank() }
+                    FolderItem(id = id, title = title, appIds = appIds)
+                } else null
+            }
+        }
+    }
+
     suspend fun updateSettings(settings: LauncherSettings) {
         context.dataStore.edit { prefs ->
             prefs[Keys.GRID_COLUMNS] = settings.gridColumns
@@ -87,6 +107,14 @@ class LauncherDataStore(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[Keys.PAGES_LAYOUT] = pages.joinToString("|") { page ->
                 page.joinToString(",")
+            }
+        }
+    }
+
+    suspend fun saveFolders(folders: List<FolderItem>) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.FOLDERS] = folders.joinToString(";;;") { folder ->
+                "${folder.id}:::${folder.title}:::${folder.appIds.joinToString(",")}"
             }
         }
     }

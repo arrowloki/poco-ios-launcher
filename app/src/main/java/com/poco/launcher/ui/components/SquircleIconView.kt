@@ -1,18 +1,28 @@
 package com.poco.launcher.ui.components
 
 import android.graphics.Bitmap
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +38,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +57,8 @@ fun SquircleIconView(
     iconSize: Dp = 60.dp,
     showLabel: Boolean = true,
     textColor: Color = Color.White,
+    isEditMode: Boolean = false,
+    onRemoveClick: (() -> Unit)? = null,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -61,8 +74,20 @@ fun SquircleIconView(
 
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1.0f,
+        targetValue = if (isPressed && !isEditMode) 0.88f else 1.0f,
         label = "icon_press_scale"
+    )
+
+    // iOS Jiggle / Wobble Animation in Edit Mode
+    val infiniteTransition = rememberInfiniteTransition(label = "icon_wobble")
+    val wobbleRotation by infiniteTransition.animateFloat(
+        initialValue = if ((app.id.hashCode() and 1) == 0) -1.8f else 1.8f,
+        targetValue = if ((app.id.hashCode() and 1) == 0) 1.8f else -1.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 135, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "wobble_rot"
     )
 
     Column(
@@ -71,32 +96,70 @@ fun SquircleIconView(
             .width(iconSize + 22.dp)
             .padding(vertical = 4.dp)
             .scale(scale)
-            .pointerInput(app.id) {
+            .graphicsLayer {
+                rotationZ = if (isEditMode) wobbleRotation else 0f
+            }
+            .pointerInput(app.id, isEditMode) {
                 detectTapGestures(
                     onPress = {
-                        isPressed = true
-                        tryAwaitRelease()
-                        isPressed = false
+                        if (!isEditMode) {
+                            isPressed = true
+                            tryAwaitRelease()
+                            isPressed = false
+                        }
                     },
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick?.invoke() }
+                    onTap = {
+                        if (!isEditMode) {
+                            onClick()
+                        }
+                    },
+                    onLongPress = {
+                        onLongClick?.invoke()
+                    }
                 )
             }
     ) {
         Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(iconSize)
-                .clip(SquircleShape())
+            modifier = Modifier.size(iconSize)
         ) {
-            if (iconBitmap != null) {
-                Image(
-                    bitmap = iconBitmap!!.asImageBitmap(),
-                    contentDescription = app.label,
-                    modifier = Modifier.size(iconSize)
-                )
-            } else {
-                Box(modifier = Modifier.size(iconSize))
+            // Squircle App Icon
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(iconSize)
+                    .clip(SquircleShape())
+            ) {
+                if (iconBitmap != null) {
+                    Image(
+                        bitmap = iconBitmap!!.asImageBitmap(),
+                        contentDescription = app.label,
+                        modifier = Modifier.size(iconSize)
+                    )
+                } else {
+                    Box(modifier = Modifier.size(iconSize))
+                }
+            }
+
+            // iOS-style (-) Delete / Remove Badge in Edit Mode
+            if (isEditMode && onRemoveClick != null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset(x = (-3).dp, y = (-3).dp)
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xE648484A))
+                        .border(1.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                        .clickable { onRemoveClick() }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(9.dp)
+                            .height(2.dp)
+                            .background(Color.White, RoundedCornerShape(1.dp))
+                    )
+                }
             }
         }
 

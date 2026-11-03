@@ -1,6 +1,7 @@
 package com.poco.launcher
 
 import com.poco.launcher.core.model.AppItem
+import com.poco.launcher.core.model.FolderItem
 import com.poco.launcher.core.model.GridItem
 import com.poco.launcher.core.model.LauncherSettings
 import org.junit.Assert.assertEquals
@@ -38,15 +39,61 @@ class LauncherUnitTest {
         assertEquals(app.id, gridApp.id)
         assertEquals("Settings", gridApp.title)
 
-        val folder = GridItem.Folder(
+        val folderItem = FolderItem(
             id = "folder_1",
             title = "Utilities",
+            appIds = listOf(app.id)
+        )
+        val folder = GridItem.Folder(
+            folder = folderItem,
             apps = listOf(app)
         )
 
         assertEquals("folder_1", folder.id)
         assertEquals("Utilities", folder.title)
         assertEquals(1, folder.apps.size)
+        assertEquals(app.id, folder.apps.first().id)
+    }
+
+    @Test
+    fun testFolderSerializationFormat() {
+        val folder1 = FolderItem(
+            id = "f1",
+            title = "Social",
+            appIds = listOf("com.whatsapp/com.whatsapp.Main", "com.twitter/com.twitter.Main")
+        )
+        val folder2 = FolderItem(
+            id = "f2",
+            title = "Tools",
+            appIds = listOf("com.calc/com.calc.Main")
+        )
+        val list = listOf(folder1, folder2)
+
+        // Test serialization
+        val serialized = list.joinToString(";;;") { folder ->
+            "${folder.id}:::${folder.title}:::${folder.appIds.joinToString(",")}"
+        }
+
+        // Test deserialization
+        val deserialized = serialized.split(";;;").mapNotNull { entry ->
+            val parts = entry.split(":::")
+            if (parts.size >= 3) {
+                FolderItem(
+                    id = parts[0],
+                    title = parts[1],
+                    appIds = parts[2].split(",").filter { it.isNotBlank() }
+                )
+            } else null
+        }
+
+        assertEquals(2, deserialized.size)
+        assertEquals("f1", deserialized[0].id)
+        assertEquals("Social", deserialized[0].title)
+        assertEquals(2, deserialized[0].appIds.size)
+        assertEquals("com.whatsapp/com.whatsapp.Main", deserialized[0].appIds[0])
+        assertEquals("f2", deserialized[1].id)
+        assertEquals("Tools", deserialized[1].title)
+        assertEquals(1, deserialized[1].appIds.size)
     }
 
     @Test

@@ -18,6 +18,13 @@ data class AppItem(
     val componentName: ComponentName get() = ComponentName(packageName, className)
 }
 
+@Immutable
+data class FolderItem(
+    val id: String,
+    val title: String,
+    val appIds: List<String>
+)
+
 sealed interface GridItem {
     val id: String
     val title: String
@@ -28,10 +35,12 @@ sealed interface GridItem {
     }
 
     data class Folder(
-        override val id: String,
-        override val title: String,
+        val folder: FolderItem,
         val apps: List<AppItem>
-    ) : GridItem
+    ) : GridItem {
+        override val id: String get() = folder.id
+        override val title: String get() = folder.title
+    }
 }
 
 @Immutable

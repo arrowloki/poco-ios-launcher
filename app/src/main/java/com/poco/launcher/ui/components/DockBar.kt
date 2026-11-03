@@ -25,8 +25,10 @@ import com.poco.launcher.ui.theme.IosColors
 fun DockBar(
     dockApps: List<AppItem>,
     iconSize: Dp = 58.dp,
+    isEditMode: Boolean = false,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: ((AppItem) -> Unit)? = null,
+    onRemoveClick: ((AppItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
@@ -56,6 +58,8 @@ fun DockBar(
                     app = app,
                     iconSize = iconSize,
                     showLabel = false, // iOS dock never displays labels
+                    isEditMode = isEditMode,
+                    onRemoveClick = onRemoveClick?.let { { it(app) } },
                     onClick = { onAppClick(app) },
                     onLongClick = { onAppLongClick?.invoke(app) }
                 )

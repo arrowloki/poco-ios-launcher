@@ -236,7 +236,7 @@ fun AppLibraryScreen(
                                         if (targetIndex >= 0) {
                                             var scrollIndex = 0
                                             var i = 0
-                                            for ((k, v) in groupedApps) {
+                                            for ((_, v) in groupedApps) {
                                                 if (i == targetIndex) break
                                                 scrollIndex += 1 + v.size
                                                 i++
