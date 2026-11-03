@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">POCO Launcher</string>
+    <string name="set_as_default">Set as Default Launcher</string>
+    <string name="search_apps_hint">Search Apps, Contacts &amp; Web…</string>
+    <string name="app_library">App Library</string>
+    <string name="control_center">Control Center</string>
+    <string name="dock">Dock</string>
+    <string name="settings">Launcher Settings</string>
+</resources>

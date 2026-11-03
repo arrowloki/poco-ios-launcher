@@ -1,0 +1,9 @@
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="ios_blue">#007AFF</color>
+    <color name="ios_gray_light">#F2F2F7</color>
+    <color name="ios_gray_dark">#1C1C1E</color>
+    <color name="ios_card_light">#E5FFFFFF</color>
+    <color name="ios_card_dark">#E52C2C2E</color>
+</resources>
