@@ -1,11 +1,14 @@
 package com.poco.launcher.ui
 
+import android.appwidget.AppWidgetManager
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 import com.poco.launcher.PocoLauncherApp
+import com.poco.launcher.core.widget.LauncherWidgetHost
 import com.poco.launcher.ui.home.HomeScreen
 import com.poco.launcher.ui.theme.PocoLauncherTheme
 
@@ -23,8 +27,47 @@ class LauncherActivity : ComponentActivity() {
 
     private val viewModel: LauncherViewModel by viewModels()
 
+    private lateinit var widgetHost: LauncherWidgetHost
+    private lateinit var appWidgetManager: AppWidgetManager
+    private var pendingWidgetId: Int = -1
+
+    private val widgetPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val appWidgetId = result.data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
+        if (result.resultCode == RESULT_OK) {
+            if (appWidgetId != -1) {
+                configureOrAddWidget(appWidgetId)
+            }
+        } else {
+            if (appWidgetId != -1) {
+                widgetHost.deleteAppWidgetId(appWidgetId)
+            }
+        }
+    }
+
+    private val widgetConfigureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val appWidgetId = result.data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId) ?: pendingWidgetId
+        if (result.resultCode == RESULT_OK) {
+            if (appWidgetId != -1) {
+                viewModel.addWidget(appWidgetId)
+            }
+        } else {
+            if (appWidgetId != -1) {
+                widgetHost.deleteAppWidgetId(appWidgetId)
+            }
+        }
+        pendingWidgetId = -1
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize AppWidget host & manager
+        widgetHost = LauncherWidgetHost(applicationContext)
+        appWidgetManager = AppWidgetManager.getInstance(applicationContext)
 
         // 1. Configure Edge-to-Edge full immersion layout
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -90,6 +133,7 @@ class LauncherActivity : ComponentActivity() {
                         activeOpenFolder = activeOpenFolder,
                         isSpotlightVisible = isSpotlightVisible,
                         isSettingsVisible = isSettingsVisible,
+                        widgetHost = widgetHost,
                         onAppClick = { app ->
                             viewModel.launchApp(app)
                         },
@@ -143,10 +187,69 @@ class LauncherActivity : ComponentActivity() {
                         },
                         onDeleteFolder = { folderId ->
                             viewModel.deleteFolder(folderId)
+                        },
+                        onPickWidget = {
+                            pickWidget()
+                        },
+                        onRemoveWidget = { widgetId ->
+                            removeWidget(widgetId)
                         }
                     )
                 }
             }
+        }
+    }
+
+    private fun pickWidget() {
+        try {
+            val appWidgetId = widgetHost.allocateAppWidgetId()
+            val pickIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            }
+            widgetPickerLauncher.launch(pickIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun configureOrAddWidget(appWidgetId: Int) {
+        val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
+        if (info?.configure != null) {
+            pendingWidgetId = appWidgetId
+            val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
+                component = info.configure
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            }
+            widgetConfigureLauncher.launch(intent)
+        } else {
+            viewModel.addWidget(appWidgetId)
+        }
+    }
+
+    private fun removeWidget(appWidgetId: Int) {
+        try {
+            widgetHost.deleteAppWidgetId(appWidgetId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        viewModel.removeWidget(appWidgetId)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        try {
+            widgetHost.startListening()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try {
+            widgetHost.stopListening()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

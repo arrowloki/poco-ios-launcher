@@ -37,6 +37,8 @@ class LauncherDataStore(private val context: Context) {
         val PAGES_LAYOUT = stringPreferencesKey("pages_layout")
         // Stored folders format: id:::title:::appId1,appId2;;;...
         val FOLDERS = stringPreferencesKey("launcher_folders")
+        // Stored widget IDs
+        val WIDGET_IDS = stringPreferencesKey("widget_ids")
     }
 
     val settingsFlow: Flow<LauncherSettings> = context.dataStore.data.map { prefs ->
@@ -87,6 +89,11 @@ class LauncherDataStore(private val context: Context) {
         }
     }
 
+    val widgetIdsFlow: Flow<List<Int>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.WIDGET_IDS] ?: ""
+        if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.toIntOrNull() }
+    }
+
     suspend fun updateSettings(settings: LauncherSettings) {
         context.dataStore.edit { prefs ->
             prefs[Keys.GRID_COLUMNS] = settings.gridColumns
@@ -124,6 +131,30 @@ class LauncherDataStore(private val context: Context) {
         }
     }
 
+    suspend fun saveWidgetIds(ids: List<Int>) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.WIDGET_IDS] = ids.joinToString(",")
+        }
+    }
+
+    suspend fun addWidgetId(id: Int) {
+        context.dataStore.edit { prefs ->
+            val raw = prefs[Keys.WIDGET_IDS] ?: ""
+            val current = if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.toIntOrNull() }
+            if (!current.contains(id)) {
+                prefs[Keys.WIDGET_IDS] = (current + id).joinToString(",")
+            }
+        }
+    }
+
+    suspend fun removeWidgetId(id: Int) {
+        context.dataStore.edit { prefs ->
+            val raw = prefs[Keys.WIDGET_IDS] ?: ""
+            val current = if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.toIntOrNull() }
+            prefs[Keys.WIDGET_IDS] = current.filterNot { it == id }.joinToString(",")
+        }
+    }
+
     // --- Configuration Backup & Restore ---
     suspend fun exportConfiguration(): String {
         val prefs = context.dataStore.data.first()
@@ -142,6 +173,7 @@ class LauncherDataStore(private val context: Context) {
         json.put("settings", settingsObj)
         json.put("dockAppIds", prefs[Keys.DOCK_APP_IDS] ?: "")
         json.put("folders", prefs[Keys.FOLDERS] ?: "")
+        json.put("widgetIds", prefs[Keys.WIDGET_IDS] ?: "")
         return json.toString(2)
     }
 
@@ -165,6 +197,9 @@ class LauncherDataStore(private val context: Context) {
                 }
                 if (json.has("folders")) {
                     prefs[Keys.FOLDERS] = json.getString("folders")
+                }
+                if (json.has("widgetIds")) {
+                    prefs[Keys.WIDGET_IDS] = json.getString("widgetIds")
                 }
             }
             true

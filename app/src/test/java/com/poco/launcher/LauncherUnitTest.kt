@@ -57,6 +57,16 @@ class LauncherUnitTest {
     }
 
     @Test
+    fun testWidgetItemProperties() {
+        val widgetItem = GridItem.Widget(widgetId = 101, spanX = 4, spanY = 2)
+        assertEquals("widget_101", widgetItem.id)
+        assertEquals("Widget", widgetItem.title)
+        assertEquals(101, widgetItem.widgetId)
+        assertEquals(4, widgetItem.spanX)
+        assertEquals(2, widgetItem.spanY)
+    }
+
+    @Test
     fun testFolderSerializationFormat() {
         val folder1 = FolderItem(
             id = "f1",

@@ -41,6 +41,12 @@ class LauncherViewModel : ViewModel() {
         initialValue = emptyList()
     )
 
+    val widgetIds: StateFlow<List<Int>> = dataStore.widgetIdsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = emptyList()
+    )
+
     // UI Interactive States
     private val _isEditMode = MutableStateFlow(false)
     val isEditMode: StateFlow<Boolean> = _isEditMode.asStateFlow()
@@ -78,16 +84,20 @@ class LauncherViewModel : ViewModel() {
         initialValue = emptyList()
     )
 
-    // Grid items combining folders and loose apps (excluding dock items)
+    // Grid items combining widgets, folders and loose apps (excluding dock items)
     val gridItems: StateFlow<List<GridItem>> = combine(
         installedApps,
         dockApps,
-        folders
-    ) { apps, dock, currentFolders ->
+        folders,
+        widgetIds
+    ) { apps, dock, currentFolders, widgets ->
         if (apps.isEmpty()) return@combine emptyList()
 
         val dockIds = dock.map { it.id }.toSet()
         val appMap = apps.associateBy { it.id }
+
+        // Widgets
+        val widgetGridItems = widgets.map { GridItem.Widget(it) }
 
         // Set of app IDs that belong to folders
         val folderAppIds = mutableSetOf<String>()
@@ -106,8 +116,8 @@ class LauncherViewModel : ViewModel() {
             .filterNot { it.id in dockIds || it.id in folderAppIds }
             .map { GridItem.App(it) }
 
-        // Folders first, followed by apps
-        folderGridItems + looseAppItems
+        // Widgets first, followed by folders, followed by apps
+        widgetGridItems + folderGridItems + looseAppItems
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -268,6 +278,19 @@ class LauncherViewModel : ViewModel() {
             if (_activeOpenFolder.value?.id == folderId) {
                 _activeOpenFolder.value = null
             }
+        }
+    }
+
+    // Widget Management
+    fun addWidget(widgetId: Int) {
+        viewModelScope.launch {
+            dataStore.addWidgetId(widgetId)
+        }
+    }
+
+    fun removeWidget(widgetId: Int) {
+        viewModelScope.launch {
+            dataStore.removeWidgetId(widgetId)
         }
     }
 

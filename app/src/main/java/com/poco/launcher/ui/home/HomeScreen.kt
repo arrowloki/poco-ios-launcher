@@ -25,13 +25,16 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -55,6 +58,7 @@ import com.poco.launcher.core.model.AppItem
 import com.poco.launcher.core.model.FolderItem
 import com.poco.launcher.core.model.GridItem
 import com.poco.launcher.core.model.LauncherSettings
+import com.poco.launcher.core.widget.LauncherWidgetHost
 import com.poco.launcher.ui.appdrawer.AppLibraryScreen
 import com.poco.launcher.ui.components.AppContextMenu
 import com.poco.launcher.ui.components.DockBar
@@ -62,6 +66,7 @@ import com.poco.launcher.ui.components.PageIndicator
 import com.poco.launcher.ui.components.SpotlightSearchPill
 import com.poco.launcher.ui.components.SquircleFolderIconView
 import com.poco.launcher.ui.components.SquircleIconView
+import com.poco.launcher.ui.components.SquircleWidgetView
 import com.poco.launcher.ui.controlcenter.ControlCenterSheet
 import com.poco.launcher.ui.settings.LauncherSettingsScreen
 import com.poco.launcher.ui.theme.IosColors
@@ -78,6 +83,7 @@ fun HomeScreen(
     activeOpenFolder: FolderItem?,
     isSpotlightVisible: Boolean,
     isSettingsVisible: Boolean,
+    widgetHost: LauncherWidgetHost? = null,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
     onFolderClick: (FolderItem) -> Unit,
@@ -96,6 +102,8 @@ fun HomeScreen(
     onUpdateSettings: (LauncherSettings) -> Unit,
     onSetAsDefault: () -> Unit,
     onDeleteFolder: (folderId: String) -> Unit,
+    onPickWidget: (() -> Unit)? = null,
+    onRemoveWidget: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val itemsPerPage = settings.gridColumns * settings.gridRows
@@ -155,7 +163,7 @@ fun HomeScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // Edit Mode Header: "Done" pill & "Settings" button
+            // Edit Mode Header: "Done" pill & "+" / "Settings" buttons
             AnimatedVisibility(
                 visible = isEditMode,
                 enter = fadeIn(tween(180)) + slideInVertically(initialOffsetY = { -it }),
@@ -168,21 +176,44 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 6.dp)
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(17.dp))
-                            .background(Color(0x66FFFFFF))
-                            .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(17.dp))
-                            .clickable { onOpenSettings() }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = "Launcher Settings",
-                            tint = Color.White,
-                            modifier = Modifier.size(19.dp)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // "+" Add Widget Button (iOS style)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(17.dp))
+                                .background(Color(0x66FFFFFF))
+                                .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(17.dp))
+                                .clickable { onPickWidget?.invoke() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "Add Widget",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // Settings Button
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(17.dp))
+                                .background(Color(0x66FFFFFF))
+                                .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(17.dp))
+                                .clickable { onOpenSettings() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = "Launcher Settings",
+                                tint = Color.White,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
 
                     // "Done" Pill
@@ -229,9 +260,22 @@ fun HomeScreen(
                         ) {
                             items(
                                 items = pageItems,
-                                key = { it.id }
+                                key = { it.id },
+                                span = { item ->
+                                    if (item is GridItem.Widget) GridItemSpan(maxLineSpan) else GridItemSpan(1)
+                                }
                             ) { gridItem ->
                                 when (gridItem) {
+                                    is GridItem.Widget -> {
+                                        if (widgetHost != null) {
+                                            SquircleWidgetView(
+                                                widgetId = gridItem.widgetId,
+                                                widgetHost = widgetHost,
+                                                isEditMode = isEditMode,
+                                                onRemoveClick = { onRemoveWidget?.invoke(gridItem.widgetId) }
+                                            )
+                                        }
+                                    }
                                     is GridItem.App -> {
                                         SquircleIconView(
                                             app = gridItem.app,

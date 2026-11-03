@@ -41,6 +41,15 @@ sealed interface GridItem {
         override val id: String get() = folder.id
         override val title: String get() = folder.title
     }
+
+    data class Widget(
+        val widgetId: Int,
+        val spanX: Int = 4,
+        val spanY: Int = 2
+    ) : GridItem {
+        override val id: String get() = "widget_$widgetId"
+        override val title: String get() = "Widget"
+    }
 }
 
 @Immutable
