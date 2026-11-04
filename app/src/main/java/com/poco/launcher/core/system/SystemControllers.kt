@@ -41,6 +41,23 @@ class SystemControllers(private val context: Context) {
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, clamped, 0)
     }
 
+    fun adjustVolumeBy(delta: Int): Float {
+        val newVol = (currentMusicVolume + delta).coerceIn(0, maxMusicVolume)
+        setMusicVolume(newVol)
+        return newVol.toFloat() / maxMusicVolume.coerceAtLeast(1)
+    }
+
+    fun dispatchMediaKey(keyCode: Int) {
+        try {
+            val eventDown = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keyCode)
+            val eventUp = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keyCode)
+            audioManager.dispatchMediaKeyEvent(eventDown)
+            audioManager.dispatchMediaKeyEvent(eventUp)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     // --- Flashlight / Torch Control ---
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
     private var torchCameraId: String? = null

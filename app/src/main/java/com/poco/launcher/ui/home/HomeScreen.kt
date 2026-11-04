@@ -62,6 +62,7 @@ import com.poco.launcher.core.widget.LauncherWidgetHost
 import com.poco.launcher.ui.appdrawer.AppLibraryScreen
 import com.poco.launcher.ui.components.AppContextMenu
 import com.poco.launcher.ui.components.DockBar
+import com.poco.launcher.ui.components.IosVolumeHud
 import com.poco.launcher.ui.components.PageIndicator
 import com.poco.launcher.ui.components.SetDefaultLauncherBanner
 import com.poco.launcher.ui.components.SpotlightSearchPill
@@ -86,6 +87,9 @@ fun HomeScreen(
     isSettingsVisible: Boolean,
     isDefaultLauncher: Boolean = true,
     isDefaultBannerDismissed: Boolean = false,
+    volumeHudRatio: Float? = null,
+    groupSourceApp: AppItem? = null,
+    folders: List<FolderItem> = emptyList(),
     widgetHost: LauncherWidgetHost? = null,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
@@ -108,6 +112,11 @@ fun HomeScreen(
     onDeleteFolder: (folderId: String) -> Unit,
     onPickWidget: (() -> Unit)? = null,
     onRemoveWidget: ((Int) -> Unit)? = null,
+    onVolumeChange: (Float) -> Unit = {},
+    onOpenGroupDialog: (AppItem) -> Unit = {},
+    onCloseGroupDialog: () -> Unit = {},
+    onGroupWithApp: (targetApp: AppItem) -> Unit = {},
+    onAddSourceToFolder: (folder: FolderItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val itemsPerPage = settings.gridColumns * settings.gridRows
@@ -297,7 +306,8 @@ fun HomeScreen(
                                             isEditMode = isEditMode,
                                             onRemoveClick = { onUninstallApp(gridItem.app) },
                                             onClick = { onAppClick(gridItem.app) },
-                                            onLongClick = { onAppLongClick(gridItem.app) }
+                                            onLongClick = { onAppLongClick(gridItem.app) },
+                                            onEditModeClick = { onOpenGroupDialog(gridItem.app) }
                                         )
                                     }
                                     is GridItem.Folder -> {
@@ -384,7 +394,20 @@ fun HomeScreen(
                 onEnterEditMode = onEnterEditMode,
                 onOpenAppInfo = onOpenAppInfo,
                 onToggleDock = onToggleDock,
-                onUninstallApp = onUninstallApp
+                onUninstallApp = onUninstallApp,
+                onGroupIntoFolder = onOpenGroupDialog
+            )
+        }
+
+        // Grouping Apps into Folder Dialog
+        if (groupSourceApp != null) {
+            GroupAppsDialog(
+                sourceApp = groupSourceApp,
+                allApps = installedApps,
+                existingFolders = folders,
+                onGroupWithApp = onGroupWithApp,
+                onAddToFolder = onAddSourceToFolder,
+                onDismiss = onCloseGroupDialog
             )
         }
 
@@ -417,6 +440,15 @@ fun HomeScreen(
             onUpdateSettings = onUpdateSettings,
             onSetAsDefault = onSetAsDefault,
             onDismiss = onCloseSettings
+        )
+
+        // Floating iOS Volume HUD Capsule on left edge
+        IosVolumeHud(
+            volumeRatio = volumeHudRatio,
+            onVolumeChange = onVolumeChange,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .statusBarsPadding()
         )
     }
 }

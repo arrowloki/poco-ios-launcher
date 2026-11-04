@@ -105,6 +105,9 @@ class LauncherActivity : ComponentActivity() {
             val isSettingsVisible by viewModel.isSettingsVisible.collectAsState()
             val isDefaultLauncher by viewModel.isDefaultLauncher.collectAsState()
             val isDefaultBannerDismissed by viewModel.isDefaultBannerDismissed.collectAsState()
+            val volumeHudRatio by viewModel.volumeHudRatio.collectAsState()
+            val groupSourceApp by viewModel.groupSourceApp.collectAsState()
+            val folders by viewModel.folders.collectAsState()
 
             // Crucial: BackHandler is unconditionally enabled (enabled = true).
             // A home launcher activity must NEVER close or call finish() when Back is pressed!
@@ -150,6 +153,9 @@ class LauncherActivity : ComponentActivity() {
                         isSettingsVisible = isSettingsVisible,
                         isDefaultLauncher = isDefaultLauncher,
                         isDefaultBannerDismissed = isDefaultBannerDismissed,
+                        volumeHudRatio = volumeHudRatio,
+                        groupSourceApp = groupSourceApp,
+                        folders = folders,
                         widgetHost = widgetHost,
                         onAppClick = { app ->
                             viewModel.launchApp(app)
@@ -213,6 +219,27 @@ class LauncherActivity : ComponentActivity() {
                         },
                         onRemoveWidget = { widgetId ->
                             removeWidget(widgetId)
+                        },
+                        onVolumeChange = { ratio ->
+                            viewModel.setVolumeRatio(ratio)
+                        },
+                        onOpenGroupDialog = { app ->
+                            viewModel.openGroupDialog(app)
+                        },
+                        onCloseGroupDialog = {
+                            viewModel.closeGroupDialog()
+                        },
+                        onGroupWithApp = { targetApp ->
+                            val src = groupSourceApp
+                            if (src != null) {
+                                viewModel.groupAppsIntoNewFolder(src, targetApp)
+                            }
+                        },
+                        onAddSourceToFolder = { folder ->
+                            val src = groupSourceApp
+                            if (src != null) {
+                                viewModel.addSourceAppToExistingFolder(src, folder)
+                            }
                         }
                     )
                 }
@@ -300,6 +327,21 @@ class LauncherActivity : ComponentActivity() {
             // Handled via Compose BackHandler, prevent Activity from finishing
             return true
         }
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            viewModel.adjustVolume(1)
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            viewModel.adjustVolume(-1)
+            return true
+        }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 }

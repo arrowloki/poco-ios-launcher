@@ -61,6 +61,7 @@ fun SquircleIconView(
     onRemoveClick: (() -> Unit)? = null,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    onEditModeClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val iconCacheManager = remember { PocoLauncherApp.instance.iconCacheManager }
@@ -111,6 +112,8 @@ fun SquircleIconView(
                     onTap = {
                         if (!isEditMode) {
                             onClick()
+                        } else {
+                            onEditModeClick?.invoke()
                         }
                     },
                     onLongPress = {

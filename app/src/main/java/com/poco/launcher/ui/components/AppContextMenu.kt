@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Dock
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,6 +56,7 @@ fun AppContextMenu(
     onOpenAppInfo: (AppItem) -> Unit,
     onToggleDock: (AppItem) -> Unit,
     onUninstallApp: (AppItem) -> Unit,
+    onGroupIntoFolder: ((AppItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (app == null) return
@@ -137,6 +139,20 @@ fun AppContextMenu(
                     },
                     textColor = textColor
                 )
+
+                // Action: Group into Folder
+                if (onGroupIntoFolder != null) {
+                    HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+                    MenuItem(
+                        icon = Icons.Rounded.Folder,
+                        label = "Group into Folder…",
+                        onClick = {
+                            onDismiss()
+                            onGroupIntoFolder(app)
+                        },
+                        textColor = textColor
+                    )
+                }
 
                 HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
 

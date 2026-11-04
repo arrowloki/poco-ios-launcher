@@ -69,6 +69,15 @@ class LauncherViewModel : ViewModel() {
     private val _isDefaultBannerDismissed = MutableStateFlow(false)
     val isDefaultBannerDismissed: StateFlow<Boolean> = _isDefaultBannerDismissed.asStateFlow()
 
+    // iOS Volume HUD State
+    private val _volumeHudRatio = MutableStateFlow<Float?>(null)
+    val volumeHudRatio: StateFlow<Float?> = _volumeHudRatio.asStateFlow()
+    private var volumeHudDismissJob: kotlinx.coroutines.Job? = null
+
+    // App Grouping into Folder Dialog State
+    private val _groupSourceApp = MutableStateFlow<AppItem?>(null)
+    val groupSourceApp: StateFlow<AppItem?> = _groupSourceApp.asStateFlow()
+
     // Dock apps combined from stored IDs or intelligent system defaults
     val dockApps: StateFlow<List<AppItem>> = combine(
         installedApps,
@@ -218,6 +227,51 @@ class LauncherViewModel : ViewModel() {
 
     fun closeSettings() {
         _isSettingsVisible.value = false
+    }
+
+    // iOS Volume HUD Controls
+    fun adjustVolume(delta: Int) {
+        val sys = PocoLauncherApp.instance.systemControllers
+        val ratio = sys.adjustVolumeBy(delta)
+        _volumeHudRatio.value = ratio
+        scheduleVolumeHudDismiss()
+    }
+
+    fun setVolumeRatio(ratio: Float) {
+        val sys = PocoLauncherApp.instance.systemControllers
+        val newVol = (ratio * sys.maxMusicVolume).toInt()
+        sys.setMusicVolume(newVol)
+        _volumeHudRatio.value = ratio
+        scheduleVolumeHudDismiss()
+    }
+
+    private fun scheduleVolumeHudDismiss() {
+        volumeHudDismissJob?.cancel()
+        volumeHudDismissJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(2000L)
+            _volumeHudRatio.value = null
+        }
+    }
+
+    // App Grouping into Folder Controls
+    fun openGroupDialog(app: AppItem) {
+        _groupSourceApp.value = app
+        _selectedContextMenuApp.value = null
+    }
+
+    fun closeGroupDialog() {
+        _groupSourceApp.value = null
+    }
+
+    fun groupAppsIntoNewFolder(sourceApp: AppItem, targetApp: AppItem) {
+        val folderTitle = if (sourceApp.label.length <= targetApp.label.length) sourceApp.label else targetApp.label
+        createFolder(folderTitle, listOf(sourceApp.id, targetApp.id))
+        closeGroupDialog()
+    }
+
+    fun addSourceAppToExistingFolder(sourceApp: AppItem, folder: FolderItem) {
+        addAppToFolder(folder.id, sourceApp.id)
+        closeGroupDialog()
     }
 
     // Folder Management
